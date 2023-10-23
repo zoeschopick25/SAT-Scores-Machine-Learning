@@ -1,0 +1,116 @@
+---
+title: "SATProject"
+output: html_document
+date: "2023-04-24"
+---
+
+```{r} 
+#Install necessary packages
+library(dplyr)
+library(data.table)
+library(ggplot2)
+library(car) 
+```
+
+```{r}
+#load csv files
+sat <- read.csv("/Users/zoeschopick/Downloads/SAT Report 2012-2013.csv")
+ca_county <- read.csv("/Users/zoeschopick/Downloads/California County Stats.csv")
+```
+
+```{r}
+#clean sat data table
+sat[sat == ""]<- NA
+sat1 <- na.omit(sat)
+names(sat1) <- c("County_Number","District_Number", "School_Number", "County_Name", "District_Name", "School_Name", "Grade_12", "Number_Tested", "Percent_Tested", "V_Mean", "M_Mean", "W_Mean", "Tot_Mean", "GE1500Ct", "Rate1500")
+sat1 <- sat1[-1,]
+sat2 <- sat1 %>% select("County_Name", "School_Name", "Percent_Tested", "V_Mean", "M_Mean", "W_Mean", "Tot_Mean")
+sat2$Percent_Tested <- as.numeric(sat2$Percent_Tested)
+sat2 <- subset(sat2, Percent_Tested<=100)
+sat2
+```
+```{r}
+#clean ca county data table
+names(ca_county) <- c("County_Name", "Median_Income", "Perc_White", "Perc_Comp", "Ppl_per_house", "HS_grad", "No_Eng")
+ca_county
+```
+```{r}
+#merge data tables and clean
+ca_sats <- merge(x = sat2, y = ca_county, by = "County_Name", all.x = TRUE)
+ca_sats$V_Mean <- as.numeric(ca_sats$V_Mean)
+ca_sats$M_Mean <- as.numeric(ca_sats$M_Mean)
+ca_sats$W_Mean <- as.numeric(ca_sats$W_Mean)
+ca_sats$Tot_Mean <- as.numeric(ca_sats$Tot_Mean)
+ca_sats
+```
+```{r}
+#create data table for analyzing, only numerical values
+ca_sat2 <- ca_sats %>% select(-County_Name, -School_Name)
+ca_sat2 <- subset(ca_sat2, Percent_Tested <= 100)
+ca_sat2
+```
+```{r}
+#investigating correlations of the data
+cor(ca_sat2)
+```
+```{r}
+#splitting data into training and testing sets
+set.seed(1)
+sample <- sample(c(TRUE, FALSE), nrow(ca_sat2), replace=TRUE, prob=c(0.7,0.3))
+train_sat <- ca_sat2[sample, ]
+test_sat <- ca_sat2[!sample, ]
+```
+
+```{r}
+#training the linear model to predict total mean SAT scores
+total_lm <- lm(Tot_Mean ~ Percent_Tested + Median_Income + Perc_White + Perc_Comp + Ppl_per_house + HS_grad + No_Eng, data = train_sat)
+summary(total_lm)
+```
+```{r}
+#training the linear model to predict verbal SAT scores
+verbal_lm <- lm(V_Mean ~ Percent_Tested + Median_Income + Perc_White + Perc_Comp + Ppl_per_house + HS_grad + No_Eng, data = train_sat)
+summary(verbal_lm)
+```
+```{r}
+#training the linear model to predict math SAT scores
+math_lm <- lm(M_Mean ~ Percent_Tested + Median_Income + Perc_White + Perc_Comp + Ppl_per_house + HS_grad + No_Eng, data = train_sat)
+summary(math_lm)
+```
+```{r}
+#training the linear model to predict writing SAT scores
+writing_lm <- lm(W_Mean ~ Percent_Tested + Median_Income + Perc_White + Perc_Comp + Ppl_per_house + HS_grad + No_Eng, data = train_sat)
+summary(writing_lm)
+```
+```{r}
+#testing the total SAT model by using the test data, finding the root mean squared error
+ca_pred <- predict(total_lm,test_sat)
+total_rmse<- sqrt(mean(ca_pred-test_sat$Tot_Mean)^2)
+total_rmse
+```
+```{r}
+#testing the math SAT model by using the test data, finding the root mean squared error
+ca_pred_math <- predict(math_lm, test_sat)
+math_rmse <- sqrt(mean(ca_pred_math-test_sat$M_Mean)^2)
+math_rmse
+```
+```{r}
+#testing the writing SAT model by using the test data, finding the root mean squared error
+ca_pred_writing <- predict(writing_lm, test_sat)
+writing_rmse <- sqrt(mean(ca_pred_writing-test_sat$W_Mean)^2)
+writing_rmse
+```
+```{r}
+#testing the verbal SAT model by using the test data, finding the root mean squared error
+ca_pred_verbal <- predict(verbal_lm, test_sat)
+verbal_rmse <- sqrt(mean(ca_pred_verbal-test_sat$V_Mean)^2)
+verbal_rmse
+```
+
+```{r}
+#plotting each variable for the total SAT scores model
+avPlots(total_lm)
+```
+```{r}
+plot(total_lm)
+```
+
